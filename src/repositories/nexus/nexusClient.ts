@@ -124,7 +124,7 @@ export class NexusClient implements PackageRepository {
                             libraries.push({
                                 name: libraryName,
                                 version: version,
-                                downloadUrl: asset.downloadUrl,
+                                downloadUrl: asset.downloadUrl ? asset.downloadUrl.replace('http://', 'https://') : asset.downloadUrl,
                                 size: sizeStr,
                                 lastModified: asset.lastModified
                             });
@@ -254,7 +254,7 @@ export class NexusClient implements PackageRepository {
                 return {
                     name: libraryName,
                     version: version,
-                    downloadUrl: asset.downloadUrl || `${this.baseUrl}/${exactName}`,
+                    downloadUrl: (asset.downloadUrl ? asset.downloadUrl.replace('http://', 'https://') : `${this.baseUrl}/${exactName}`),
                     size: sizeStr,
                     lastModified: asset.lastModified,
                     // Información adicional disponible en la búsqueda
