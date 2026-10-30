@@ -22,7 +22,7 @@ A Visual Studio Code extension for managing Flutter libraries from Nexus/Artifac
 
 1. Install the extension from the VSCode Marketplace
 2. Open a Flutter project in VSCode
-3. Look for the "ABEXA Libraries" panel in the Explorer sidebar
+3. Look for the "Lib Manager" panel in the Explorer sidebar
 4. Configure your Nexus repository URL and credentials
 5. Start browsing and managing your libraries!
 

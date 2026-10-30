@@ -1,14 +1,14 @@
 import * as vscode from 'vscode';
-import { LibraryProvider, Library } from './providers/libraryProvider';
-import { NexusClient } from './providers/nexusClient';
+import { LibraryProvider, Library } from './tree/libraryProvider';
+import { NexusClient } from './repositories/nexus/nexusClient';
 import * as path from 'path';
 import * as fs from 'fs-extra';
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('🚀 ABEXA Flutter Libraries extension activated');
+    console.log('🚀 LibManager Flutter Libraries extension activated');
 
     // Mostrar mensaje de activación inmediato
-    vscode.window.showInformationMessage('🎉 ABEXA Extension activated! Check Activity Bar for the ABEXA icon.');
+    vscode.window.showInformationMessage('🎉 [LibManager] Extension activated! Check Activity Bar for the LibManager icon.');
 
     // Inicializar providers
     const nexusClient = new NexusClient(context);
@@ -19,7 +19,7 @@ export function activate(context: vscode.ExtensionContext) {
         const isConfigured = await nexusClient.isConfigured();
         if (!isConfigured) {
             const setupResult = await vscode.window.showInformationMessage(
-                'ABEXA not configured. Setup Artifactory connection?',
+                '[LibManager] not configured. Setup Artifactory connection?',
                 'Setup Now', 'Later'
             );
             
@@ -31,7 +31,7 @@ export function activate(context: vscode.ExtensionContext) {
     }, 2000);
 
     // Registrar TreeView
-    const treeView = vscode.window.createTreeView('abexaLibraries', {
+    const treeView = vscode.window.createTreeView('libmanagerLibraries', {
         treeDataProvider: libraryProvider,
         showCollapseAll: true
     });
@@ -42,24 +42,58 @@ export function activate(context: vscode.ExtensionContext) {
     });
     
     // Comando para mostrar detalles (se ejecuta en doble clic via contributes)
-    const showDetailsCommand = vscode.commands.registerCommand('abexa.showDetails', async (library: Library) => {
+    const showDetailsCommand = vscode.commands.registerCommand('libmanager.showDetails', async (library: Library) => {
         if (library instanceof Library) {
             await showLibraryDetails(library, nexusClient);
         }
     });
 
     // Comando: Refrescar librerías
-    const refreshCommand = vscode.commands.registerCommand('abexa.refreshLibraries', () => {
+    const refreshCommand = vscode.commands.registerCommand('libmanager.refreshLibraries', () => {
         libraryProvider.refresh();
         
-        const config = vscode.workspace.getConfiguration('abexa');
+        const config = vscode.workspace.getConfiguration('libmanager');
         if (config.get('showNotifications', true)) {
-            vscode.window.showInformationMessage('🔄 Refreshing ABEXA libraries...');
+            vscode.window.showInformationMessage('🔄 [LibManager] Refreshing libraries...');
+        }
+    });
+
+    // Comando: Actualizar credenciales de Artifactory
+    const updateCredentialsCommand = vscode.commands.registerCommand('libmanager.updateCredentials', async () => {
+        const cfg = vscode.workspace.getConfiguration('libmanager');
+        const currentUrl = cfg.get('nexusUrl', 'https://artifactory-service.abexa.pe/repository/flutter-libraries');
+        const currentUser = cfg.get('username', '');
+
+        const url = await vscode.window.showInputBox({
+            prompt: 'Artifactory URL',
+            value: currentUrl
+        });
+        if (!url) { return; }
+
+        const username = await vscode.window.showInputBox({
+            prompt: 'Nexus username',
+            value: currentUser
+        });
+        if (username === undefined) { return; }
+
+        const password = await vscode.window.showInputBox({
+            prompt: 'Nexus password',
+            password: true
+        });
+        if (password === undefined) { return; }
+
+        try {
+            await nexusClient.setRepositoryUrl(url);
+            await nexusClient.setCredentials(username, password);
+            vscode.window.showInformationMessage('✅ [LibManager] credentials updated');
+            libraryProvider.refresh();
+        } catch (e) {
+            vscode.window.showErrorMessage(`Failed to update credentials: ${e}`);
         }
     });
 
     // Comando: Instalar librería
-    const installCommand = vscode.commands.registerCommand('abexa.installLibrary', async (library: Library) => {
+    const installCommand = vscode.commands.registerCommand('libmanager.installLibrary', async (library: Library) => {
         if (!library) {
             vscode.window.showErrorMessage('No library selected');
             return;
@@ -84,7 +118,7 @@ export function activate(context: vscode.ExtensionContext) {
                     await installLibrary(library, workspaceFolder.uri.fsPath, nexusClient);
                 });
 
-                const config = vscode.workspace.getConfiguration('abexa');
+                const config = vscode.workspace.getConfiguration('libmanager');
                 if (config.get('showNotifications', true)) {
                     vscode.window.showInformationMessage(`✅ ${library.name} installed successfully!`);
                 }
@@ -97,7 +131,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Comando: Publicar librería
-    const publishCommand = vscode.commands.registerCommand('abexa.publishLibrary', async () => {
+    const publishCommand = vscode.commands.registerCommand('libmanager.publishLibrary', async () => {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
             vscode.window.showErrorMessage('No workspace folder found');
@@ -149,12 +183,12 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Comando: Configuración
-    const settingsCommand = vscode.commands.registerCommand('abexa.openSettings', async () => {
+    const settingsCommand = vscode.commands.registerCommand('libmanager.openSettings', async () => {
         const isConfigured = await nexusClient.isConfigured();
         
         if (!isConfigured) {
             const setupResult = await vscode.window.showInformationMessage(
-                'Setup ABEXA Artifactory connection?',
+                'Setup LibManager Artifactory connection?',
                 'Setup', 'Open Settings'
             );
             
@@ -169,7 +203,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Comando: Ver detalles de librería
-    const viewDetailsCommand = vscode.commands.registerCommand('abexa.viewLibraryDetails', async (library: Library) => {
+    const viewDetailsCommand = vscode.commands.registerCommand('libmanager.viewLibraryDetails', async (library: Library) => {
         if (!library) {
             return;
         }
@@ -185,7 +219,7 @@ ${library.downloadUrl ? `Download URL: ${library.downloadUrl}` : ''}
     });
 
     // Comando: Remover librería
-    const removeCommand = vscode.commands.registerCommand('abexa.removeLibrary', async (library: Library) => {
+    const removeCommand = vscode.commands.registerCommand('libmanager.removeLibrary', async (library: Library) => {
         if (!library) {
             vscode.window.showErrorMessage('No library selected');
             return;
@@ -225,7 +259,7 @@ ${library.downloadUrl ? `Download URL: ${library.downloadUrl}` : ''}
     });
 
     // Auto-refresh al inicio si está habilitado
-    const config = vscode.workspace.getConfiguration('abexa');
+    const config = vscode.workspace.getConfiguration('libmanager');
     if (config.get('autoRefresh', true)) {
         setTimeout(() => libraryProvider.refresh(), 1000);
     }
@@ -238,6 +272,7 @@ ${library.downloadUrl ? `Download URL: ${library.downloadUrl}` : ''}
         viewDetailsCommand,
         removeCommand,
         showDetailsCommand,
+        updateCredentialsCommand,
         treeView
     );
 }
@@ -447,10 +482,10 @@ async function showLibraryDetails(library: Library, nexusClient: NexusClient): P
         panel.webview.onDidReceiveMessage(async (message) => {
             switch (message.command) {
                 case 'installLibrary':
-                    vscode.commands.executeCommand('abexa.installLibrary', library);
+                    vscode.commands.executeCommand('libmanager.installLibrary', library);
                     break;
                 case 'removeLibrary':
-                    vscode.commands.executeCommand('abexa.removeLibrary', library);
+                    vscode.commands.executeCommand('libmanager.removeLibrary', library);
                     break;
             }
         });
@@ -493,7 +528,7 @@ async function setupArtifactory(nexusClient: NexusClient): Promise<void> {
 
     try {
         // Guardar configuración
-        await nexusClient.setArtifactoryUrl(artifactoryUrl);
+        await nexusClient.setRepositoryUrl(artifactoryUrl);
         await nexusClient.setCredentials(username, password);
         
         vscode.window.showInformationMessage('✅ ABEXA Artifactory configured successfully!');
@@ -503,7 +538,7 @@ async function setupArtifactory(nexusClient: NexusClient): Promise<void> {
 }
 
 async function installLibrary(library: Library, workspacePath: string, nexusClient: NexusClient): Promise<void> {
-    const config = vscode.workspace.getConfiguration('abexa');
+    const config = vscode.workspace.getConfiguration('libmanager');
     const packagesDir = config.get('packagesDirectory', 'build/packages');
     const packagesPath = path.join(workspacePath, packagesDir);
     
@@ -629,7 +664,7 @@ async function updatePubspecDependency(workspacePath: string, libraryName: strin
 }
 
 async function removeLibrary(library: Library, workspacePath: string): Promise<void> {
-    const config = vscode.workspace.getConfiguration('abexa');
+    const config = vscode.workspace.getConfiguration('libmanager');
     const packagesDir = config.get('packagesDirectory', 'build/packages');
     const packagesPath = path.join(workspacePath, packagesDir);
     const libraryPath = path.join(packagesPath, library.name);
@@ -690,5 +725,5 @@ async function removePubspecDependency(workspacePath: string, libraryName: strin
 }
 
 export function deactivate() {
-    console.log('ABEXA Flutter Libraries extension deactivated');
+    console.log('LibManager Flutter Libraries extension deactivated');
 }

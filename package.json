@@ -1,16 +1,16 @@
 {
-  "name": "abexa-flutter-libraries",
-  "displayName": "ABEXA Flutter Libraries",
-  "description": "Manage ABEXA private Flutter libraries from Nexus repository",
-  "version": "0.0.1",
+  "name": "libmanager-flutter-libraries",
+  "displayName": "Registry Libraries",
+  "description": "Manage Registry private from Nexus repository",
+  "version": "1.0.0",
   "publisher": "KaneBaltazarAlanoca",
   "repository": {
     "type": "git",
-    "url": "https://github.com/innovadeveloper/abexa-flutter-libraries"
+    "url": "https://github.com/innovadeveloper/libmanager-flutter-libraries"
   },
-  "homepage": "https://github.com/innovadeveloper/abexa-flutter-libraries#readme",
+  "homepage": "https://github.com/innovadeveloper/libmanager-flutter-libraries#readme",
   "bugs": {
-    "url": "https://github.com/innovadeveloper/abexa-flutter-libraries/issues"
+    "url": "https://github.com/innovadeveloper/libmanager-flutter-libraries/issues"
   },
   "license": "MIT",
   "engines": {
@@ -34,50 +34,55 @@
   "contributes": {
     "commands": [
       {
-        "command": "abexa.refreshLibraries",
-        "title": "Refresh Libraries",
+        "command": "libmanager.refreshLibraries",
+        "title": "[LibManager] Refresh Libraries",
         "icon": "$(refresh)"
       },
       {
-        "command": "abexa.installLibrary",
-        "title": "Install Library",
+        "command": "libmanager.installLibrary",
+        "title": "[LibManager] Install Library",
         "icon": "$(cloud-download)"
       },
       {
-        "command": "abexa.publishLibrary",
-        "title": "Publish Library",
+        "command": "libmanager.publishLibrary",
+        "title": "[LibManager] Publish Library",
         "icon": "$(cloud-upload)"
       },
       {
-        "command": "abexa.updateLibrary",
-        "title": "Update Library",
+        "command": "libmanager.updateLibrary",
+        "title": "[LibManager] Update Library",
         "icon": "$(sync)"
       },
       {
-        "command": "abexa.removeLibrary",
-        "title": "Remove Library",
+        "command": "libmanager.removeLibrary",
+        "title": "[LibManager] Remove Library",
         "icon": "$(trash)"
       },
       {
-        "command": "abexa.openSettings",
-        "title": "Open Settings",
+        "command": "libmanager.openSettings",
+        "title": "[LibManager] Open Settings",
         "icon": "$(gear)"
       },
       {
-        "command": "abexa.viewLibraryDetails",
-        "title": "View Details",
+        "command": "libmanager.viewLibraryDetails",
+        "title": "[LibManager] View Details",
         "icon": "$(info)"
       },
       {
-        "command": "abexa.showDetails",
-        "title": "Show Details"
+        "command": "libmanager.showDetails",
+        "title": "[LibManager] Show Details"
+      },
+      {
+        "command": "libmanager.updateCredentials",
+        "title": "[LibManager] Update Artifactory Credentials",
+        "icon": "$(key)"
       }
     ],
     "views": {
-      "abexa-explorer": [
+      "libmanager-explorer": [
         {
-          "id": "abexaLibraries",
-          "name": "ABEXA Libraries",
+          "id": "libmanagerLibraries",
+          "name": "Lib Manager",
           "when": "true"
         }
       ]
@@ -85,8 +90,8 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "abexa-explorer",
-          "title": "ABEXA Libraries",
+          "id": "libmanager-explorer",
+          "title": "Lib Manager",
           "icon": "$(package)"
         }
       ]
@@ -94,80 +99,80 @@
     "menus": {
       "view/title": [
         {
-          "command": "abexa.refreshLibraries",
-          "when": "view == abexaLibraries",
+          "command": "libmanager.refreshLibraries",
+          "when": "view == libmanagerLibraries",
           "group": "navigation@1"
         },
         {
-          "command": "abexa.publishLibrary",
-          "when": "view == abexaLibraries",
+          "command": "libmanager.publishLibrary",
+          "when": "view == libmanagerLibraries",
           "group": "navigation@2"
         },
         {
-          "command": "abexa.openSettings",
-          "when": "view == abexaLibraries",
+          "command": "libmanager.openSettings",
+          "when": "view == libmanagerLibraries",
           "group": "navigation@3"
         }
       ],
       "view/item/context": [
         {
-          "command": "abexa.installLibrary",
-          "when": "view == abexaLibraries && viewItem == availableLibrary",
+          "command": "libmanager.installLibrary",
+          "when": "view == libmanagerLibraries && viewItem == availableLibrary",
           "group": "inline@1"
         },
         {
-          "command": "abexa.viewLibraryDetails",
-          "when": "view == abexaLibraries && viewItem == availableLibrary",
+          "command": "libmanager.viewLibraryDetails",
+          "when": "view == libmanagerLibraries && viewItem == availableLibrary",
           "group": "context@1"
         },
         {
-          "command": "abexa.updateLibrary",
-          "when": "view == abexaLibraries && viewItem == installedLibrary",
+          "command": "libmanager.updateLibrary",
+          "when": "view == libmanagerLibraries && viewItem == installedLibrary",
           "group": "inline@1"
         },
         {
-          "command": "abexa.removeLibrary",
-          "when": "view == abexaLibraries && viewItem == installedLibrary",
+          "command": "libmanager.removeLibrary",
+          "when": "view == libmanagerLibraries && viewItem == installedLibrary",
           "group": "inline@2"
         },
         {
-          "command": "abexa.viewLibraryDetails",
-          "when": "view == abexaLibraries && viewItem == installedLibrary",
+          "command": "libmanager.viewLibraryDetails",
+          "when": "view == libmanagerLibraries && viewItem == installedLibrary",
           "group": "context@1"
         },
         {
-          "command": "abexa.showDetails",
-          "when": "view == abexaLibraries && (viewItem == availableLibrary || viewItem == installedLibrary)",
+          "command": "libmanager.showDetails",
+          "when": "view == libmanagerLibraries && (viewItem == availableLibrary || viewItem == installedLibrary)",
           "group": "inline@0"
         }
       ]
     },
     "configuration": {
-      "title": "ABEXA Flutter Libraries",
+      "title": "LibManager Flutter Libraries",
       "properties": {
-        "abexa.nexusUrl": {
+        "libmanager.nexusUrl": {
           "type": "string",
           "default": "",
           "description": "Nexus repository URL for Flutter libraries",
           "pattern": "^https?://.*",
           "patternErrorMessage": "Must be a valid HTTP(S) URL"
         },
-        "abexa.username": {
+        "libmanager.username": {
           "type": "string",
           "default": "",
           "description": "Username for Nexus authentication"
         },
-        "abexa.autoRefresh": {
+        "libmanager.autoRefresh": {
           "type": "boolean",
           "default": true,
           "description": "Automatically refresh libraries list on startup"
         },
-        "abexa.packagesDirectory": {
+        "libmanager.packagesDirectory": {
           "type": "string",
           "default": "build/packages",
           "description": "Directory where private libraries are stored"
         },
-        "abexa.showNotifications": {
+        "libmanager.showNotifications": {
           "type": "boolean",
           "default": true,
           "description": "Show success/error notifications"

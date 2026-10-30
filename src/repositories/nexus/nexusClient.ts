@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import * as vscode from 'vscode';
+import { PackageRepository } from '../../core/interfaces';
 
 export interface LibraryInfo {
     name: string;
@@ -19,7 +20,7 @@ export interface LibraryInfo {
     blobCreated?: string;
 }
 
-export class NexusClient {
+export class NexusClient implements PackageRepository {
     private client: AxiosInstance;
     private baseUrl: string = '';
     private username: string = '';
@@ -38,12 +39,12 @@ export class NexusClient {
     }
 
     private async loadConfiguration() {
-        const config = vscode.workspace.getConfiguration('abexa');
+        const config = vscode.workspace.getConfiguration('libmanager');
         this.baseUrl = config.get('nexusUrl', '');
         this.username = config.get('username', '');
         
         if (this.context) {
-            this.password = await this.context.secrets.get('abexa.password') || '';
+            this.password = await this.context.secrets.get('libmanager.password') || '';
         }
     }
 
@@ -57,18 +58,18 @@ export class NexusClient {
         this.password = password;
         
         // Guardar username en configuración
-        const config = vscode.workspace.getConfiguration('abexa');
+        const config = vscode.workspace.getConfiguration('libmanager');
         await config.update('username', username, vscode.ConfigurationTarget.Global);
         
         // Guardar password en SecretStorage seguro
         if (this.context) {
-            await this.context.secrets.store('abexa.password', password);
+            await this.context.secrets.store('libmanager.password', password);
         }
     }
 
-    public async setArtifactoryUrl(url: string): Promise<void> {
+    public async setRepositoryUrl(url: string): Promise<void> {
         this.baseUrl = url;
-        const config = vscode.workspace.getConfiguration('abexa');
+        const config = vscode.workspace.getConfiguration('libmanager');
         await config.update('nexusUrl', url, vscode.ConfigurationTarget.Global);
     }
 

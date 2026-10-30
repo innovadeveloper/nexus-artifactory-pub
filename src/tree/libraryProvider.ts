@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { NexusClient, LibraryInfo } from './nexusClient';
+import { PackageRepository, LibraryInfo } from '../core/interfaces';
 import * as path from 'path';
 import * as fs from 'fs-extra';
 
@@ -29,6 +29,20 @@ export class Library extends vscode.TreeItem {
     }
 }
 
+export class LibraryNameGroup extends vscode.TreeItem {
+    constructor(
+        public readonly name: string,
+        public readonly libraries: Library[],
+        collapsibleState: vscode.TreeItemCollapsibleState = vscode.TreeItemCollapsibleState.Expanded
+    ) {
+        super(name, collapsibleState);
+        this.tooltip = `${name} (${libraries.length} versions)`;
+        this.contextValue = 'libraryNameGroup';
+        this.iconPath = new vscode.ThemeIcon('symbol-namespace');
+        this.description = `${libraries.length} versions`;
+    }
+}
+
 export class LibraryCategory extends vscode.TreeItem {
     constructor(
         public readonly label: string,
@@ -43,14 +57,14 @@ export class LibraryCategory extends vscode.TreeItem {
     }
 }
 
-export class LibraryProvider implements vscode.TreeDataProvider<Library | LibraryCategory> {
-    private _onDidChangeTreeData: vscode.EventEmitter<Library | LibraryCategory | undefined | null | void> = new vscode.EventEmitter<Library | LibraryCategory | undefined | null | void>();
-    readonly onDidChangeTreeData: vscode.Event<Library | LibraryCategory | undefined | null | void> = this._onDidChangeTreeData.event;
+export class LibraryProvider implements vscode.TreeDataProvider<Library | LibraryCategory | LibraryNameGroup> {
+    private _onDidChangeTreeData: vscode.EventEmitter<Library | LibraryCategory | LibraryNameGroup | undefined | null | void> = new vscode.EventEmitter<Library | LibraryCategory | LibraryNameGroup | undefined | null | void>();
+    readonly onDidChangeTreeData: vscode.Event<Library | LibraryCategory | LibraryNameGroup | undefined | null | void> = this._onDidChangeTreeData.event;
 
     private availableLibraries: Library[] = [];
     private installedLibraries: Library[] = [];
 
-    constructor(private nexusClient: NexusClient) {
+    constructor(private repository: PackageRepository) {
         this.refresh();
     }
 
@@ -59,11 +73,11 @@ export class LibraryProvider implements vscode.TreeDataProvider<Library | Librar
         this._onDidChangeTreeData.fire();
     }
 
-    getTreeItem(element: Library | LibraryCategory): vscode.TreeItem {
+    getTreeItem(element: Library | LibraryCategory | LibraryNameGroup): vscode.TreeItem {
         return element;
     }
 
-    getChildren(element?: Library | LibraryCategory): Thenable<(Library | LibraryCategory)[]> {
+    getChildren(element?: Library | LibraryCategory | LibraryNameGroup): Thenable<(Library | LibraryCategory | LibraryNameGroup)[]> {
         if (!element) {
             // Root level - mostrar categorías
             const categories: LibraryCategory[] = [];
@@ -91,10 +105,23 @@ export class LibraryProvider implements vscode.TreeDataProvider<Library | Librar
 
             return Promise.resolve(categories);
         } else if (element instanceof LibraryCategory) {
-            // Devolver las librerías de la categoría
+            // Agrupar librerías por nombre para mostrar encabezados de versión
+            const groups = new Map<string, Library[]>();
+            for (const lib of element.libraries) {
+                if (!groups.has(lib.name)) {
+                    groups.set(lib.name, []);
+                }
+                groups.get(lib.name)!.push(lib);
+            }
+            const groupItems = Array.from(groups.entries()).map(([name, libs]) =>
+                new LibraryNameGroup(name, libs)
+            );
+            return Promise.resolve(groupItems);
+        } else if (element instanceof LibraryNameGroup) {
+            // Devolver las versiones de esta librería
             return Promise.resolve(element.libraries);
         } else {
-            // Library items no tienen hijos
+            // Library items (hojas) no tienen hijos
             return Promise.resolve([]);
         }
     }
@@ -102,7 +129,7 @@ export class LibraryProvider implements vscode.TreeDataProvider<Library | Librar
     private async loadLibraries(): Promise<void> {
         try {
             // Cargar librerías disponibles desde Nexus
-            const availableLibraries = await this.nexusClient.getAvailableLibraries();
+            const availableLibraries = await this.repository.getAvailableLibraries();
             console.log(`📦 Loaded ${availableLibraries.length} libraries from Nexus:`, 
                 availableLibraries.map(lib => `${lib.name}@${lib.version}`));
             
