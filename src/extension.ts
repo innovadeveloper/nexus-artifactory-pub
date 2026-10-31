@@ -138,20 +138,73 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        // Verificar si estamos en el directorio de una librería
-        const pubspecPath = path.join(workspaceFolder.uri.fsPath, 'pubspec.yaml');
-        if (!await fs.pathExists(pubspecPath)) {
-            vscode.window.showErrorMessage('No pubspec.yaml found in current directory');
+        // Buscar librerías: raíz o subpaquetes (multimódulo / workspace)
+        const workspaceRoot = workspaceFolder.uri.fsPath;
+        let candidates: { dir: string, name: string, label: string }[] = [];
+
+        const rootPubspec = path.join(workspaceRoot, 'pubspec.yaml');
+        if (await fs.pathExists(rootPubspec)) {
+            try {
+                const content = await fs.readFile(rootPubspec, 'utf8');
+                const yaml = require('yaml');
+                const p = yaml.parse(content);
+                candidates.push({ dir: workspaceRoot, name: p.name || 'root', label: p.name ? `${p.name} (root)` : 'root' });
+            } catch {
+                candidates.push({ dir: workspaceRoot, name: 'root', label: 'root' });
+            }
+        }
+
+        const entries = await fs.readdir(workspaceRoot, { withFileTypes: true });
+        for (const entry of entries) {
+            if (entry.isDirectory() && !['.git','build','.dart_tool','node_modules','assets','.vscode'].includes(entry.name)) {
+                const subPubspec = path.join(workspaceRoot, entry.name, 'pubspec.yaml');
+                if (await fs.pathExists(subPubspec)) {
+                    try {
+                        const content = await fs.readFile(subPubspec, 'utf8');
+                        const yaml = require('yaml');
+                        const p = yaml.parse(content);
+                        candidates.push({ dir: path.join(workspaceRoot, entry.name), name: p.name || entry.name, label: `${p.name || entry.name} (${entry.name})` });
+                    } catch {
+                        candidates.push({ dir: path.join(workspaceRoot, entry.name), name: entry.name, label: entry.name });
+                    }
+                }
+            }
+        }
+
+        if (candidates.length === 0) {
+            vscode.window.showErrorMessage('No pubspec.yaml found in current directory or sub-packages');
             return;
         }
 
-        // Leer nombre y versión actual del pubspec.yaml
+        let selectedDir: string = workspaceRoot;
+        let libraryName: string = candidates[0].name;
+
+        if (candidates.length > 1) {
+            const quickItems = candidates.map(c => ({ label: c.name, description: c.dir === workspaceRoot ? '(workspace root)' : c.dir.replace(workspaceRoot, '').replace(/^\//, ''), dir: c.dir }));
+            const pick = await vscode.window.showQuickPick(quickItems, { placeHolder: 'Select package/library to publish' });
+            if (!pick) return;
+            selectedDir = pick.dir;
+            libraryName = pick.label;
+            // Recuperar nombre real del pubspec si es diferente del label
+            try {
+                const realContent = await fs.readFile(path.join(selectedDir, 'pubspec.yaml'), 'utf8');
+                const yaml = require('yaml');
+                const p = yaml.parse(realContent);
+                if (p.name) libraryName = p.name;
+            } catch { /* ign */ }
+        } else {
+            selectedDir = candidates[0].dir;
+            libraryName = candidates[0].name;
+        }
+
+        // Leer nombre y versión actual del pubspec seleccionado
         try {
+            const pubspecPath = path.join(selectedDir, 'pubspec.yaml');
             const pubspecContent = await fs.readFile(pubspecPath, 'utf8');
             const yaml = require('yaml');
             const pubspec = yaml.parse(pubspecContent);
 
-            const libraryName = pubspec.name;
+            libraryName = pubspec.name || libraryName;
             const currentVersion = pubspec.version || '0.0.1';
 
             // Mostrar input para nueva versión
@@ -168,7 +221,7 @@ export function activate(context: vscode.ExtensionContext) {
                         title: `Publishing ${libraryName} v${version}...`,
                         cancellable: false
                     }, async (progress) => {
-                        await publishCurrentLibrary(workspaceFolder.uri.fsPath, libraryName, version, nexusClient);
+                        await publishCurrentLibrary(selectedDir, libraryName, version, nexusClient);
                     });
 
                     vscode.window.showInformationMessage(`✅ ${libraryName} v${version} published successfully!`);
@@ -531,7 +584,7 @@ async function setupArtifactory(nexusClient: NexusClient): Promise<void> {
         await nexusClient.setRepositoryUrl(artifactoryUrl);
         await nexusClient.setCredentials(username, password);
         
-        vscode.window.showInformationMessage('✅ ABEXA Artifactory configured successfully!');
+        vscode.window.showInformationMessage('✅ Artifactory configured successfully!');
     } catch (error) {
         vscode.window.showErrorMessage(`❌ Failed to save configuration: ${error}`);
     }
