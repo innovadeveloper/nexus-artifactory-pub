@@ -376,9 +376,26 @@ function buildCompatibilityHtml(results: any[]): string {
     const perms = r.permissions ? `<td>A:${(r.permissions.android||[]).join(', ').substring(0,40)} / I:${(r.permissions.ios||[]).join(', ').substring(0,40)}</td>` : '<td>-</td>';
     return `<tr><td><b>${r.moduleName}</b><br><small>${r.modulePath}</small><br><span style="font-size:10px;color:#666">${r.type}</span></td><td>${r.version}</td><td>${r.sdk||'-'}</td><td>${r.type}</td>${android}${ios}${perms}</tr>`;
   }).join('');
+  // Conflicts / Warnings
+  const normalizeVer = (s: string) => { const m = s && s.match(/(\d+\.\d+\.\d+)/); return m ? m[1] : (s || ''); };
+  const warnings: string[] = [];
+  const sdks = results.map((r: any) => normalizeVer(r.sdk));
+  const uniqueSdks = [...new Set(sdks.filter(Boolean))];
+  if (uniqueSdks.length > 1) warnings.push(`SDK conflict: ${results.map((r: any) => r.sdk || '-').filter(Boolean).join(', ')}`);
+  const compileSdks = results.map((r: any) => normalizeVer(r.android?.compileSdk));
+  const uniqueCompile = [...new Set(compileSdks.filter(Boolean))];
+  if (uniqueCompile.length > 1) warnings.push(`compileSdk conflict: ${results.map((r: any) => r.android?.compileSdk || '-').filter((v: string) => v && v !== '-').join(', ')}`);
+  const minSdks = results.map((r: any) => normalizeVer(r.android?.minSdk));
+  const uniqueMin = [...new Set(minSdks.filter(Boolean))];
+  if (uniqueMin.length > 1) warnings.push(`minSdk conflict: ${results.map((r: any) => r.android?.minSdk || '-').filter((v: string) => v && v !== '-').join(', ')}`);
+
+  const warningsHtml = warnings.length ? `<h2>Warnings</h2><ul style="color:#c0392b">${warnings.map((w: string) => `<li>${w}</li>`).join('')}</ul>` : '<p style="color:#27ae60">No version conflicts detected.</p>';
+
   return `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;padding:20px;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #ccc;padding:8px;text-align:left;font-size:12px;}th{background:#2c3e50;color:#fff;}tr:nth-child(even){background:#f2f2f2;}</style></head><body>
+<html><head><meta charset="UTF-8"><script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script><style>body{font-family:sans-serif;padding:20px;background:#f8f9fa;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #ccc;padding:8px;text-align:left;font-size:12px;}th{background:#2c3e50;color:#fff;}tr:nth-child(even){background:#fff;}h1{color:#2c3e50;}h2{color:#e67e22;}@media print{button{display:none;}body{background:#fff;padding:0;}table{font-size:10px;}}</style></head><body>
 <h1>Module Compatibility Scan</h1>
+<button onclick="html2pdf().set({margin:5,filename:'compatibility_scan.pdf',jsPDF:{unit:'mm',format:'a3',orientation:'landscape'},html2canvas:{scale:2}}).from(document.querySelector('table')).save()" style="margin-bottom:12px;padding:6px 14px;background:#2c3e50;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;">Download PDF</button>
+${warningsHtml}
 <table><tr><th>Module</th><th>Ver</th><th>SDK</th><th>Type</th><th>Android (AGP/Grad/Kotlin)</th><th>iOS (Pod/Deploy)</th><th>Permissions (A / I)</th></tr>
 ${rows}</table></body></html>`;
 }
