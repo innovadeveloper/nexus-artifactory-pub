@@ -54,6 +54,11 @@
         "icon": "$(sync)"
       },
       {
+        "command": "libmanager.scanModule",
+        "title": "[LibManager] Scan Compatibility",
+        "icon": "$(search)"
+      },
+      {
         "command": "libmanager.removeLibrary",
         "title": "[LibManager] Remove Library",
         "icon": "$(trash)"
@@ -83,6 +88,11 @@
         {
           "id": "libmanagerLibraries",
           "name": "Lib Manager",
+          "when": "true"
+        },
+        {
+          "id": "libmanagerCompatibility",
+          "name": "Compatibility Scanner",
           "when": "true"
         }
       ]

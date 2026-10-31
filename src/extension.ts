@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { LibraryProvider, Library } from './tree/libraryProvider';
+import { CompatibilityProvider, CompatibilityNode } from './tree/compatibilityProvider';
 import { NexusClient } from './repositories/nexus/nexusClient';
 import * as path from 'path';
 import * as fs from 'fs-extra';
@@ -13,6 +14,8 @@ export function activate(context: vscode.ExtensionContext) {
     // Inicializar providers
     const nexusClient = new NexusClient(context);
     const libraryProvider = new LibraryProvider(nexusClient);
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const compatibilityProvider = new CompatibilityProvider(workspaceFolder ? workspaceFolder.uri.fsPath : '');
 
     // Verificar configuración inicial
     setTimeout(async () => {
@@ -33,6 +36,11 @@ export function activate(context: vscode.ExtensionContext) {
     // Registrar TreeView
     const treeView = vscode.window.createTreeView('libmanagerLibraries', {
         treeDataProvider: libraryProvider,
+        showCollapseAll: true
+    });
+
+    const compatibilityView = vscode.window.createTreeView('libmanagerCompatibility', {
+        treeDataProvider: compatibilityProvider,
         showCollapseAll: true
     });
 
@@ -317,6 +325,35 @@ ${library.downloadUrl ? `Download URL: ${library.downloadUrl}` : ''}
         setTimeout(() => libraryProvider.refresh(), 1000);
     }
 
+    const scanModuleCommand = vscode.commands.registerCommand('libmanager.scanModule', async (node?: CompatibilityNode) => {
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+        if (!workspaceRoot) {
+            vscode.window.showErrorMessage('No workspace folder');
+            return;
+        }
+        try {
+            const { scanModule } = require('./repositories/compatibility/compatibilityScanner');
+            const modules = [workspaceRoot];
+            const fs = require('fs-extra');
+            const entries = await fs.readdir(workspaceRoot, { withFileTypes: true });
+            for (const e of entries) {
+                if (e.isDirectory() && !['.git','build','.dart_tool','node_modules','.vscode'].includes(e.name)) {
+                    const sub = path.join(workspaceRoot, e.name);
+                    if (await fs.pathExists(path.join(sub, 'pubspec.yaml'))) modules.push(sub);
+                }
+            }
+            const results = await Promise.all(modules.map(async (m: string) => {
+                const d = await scanModule(m);
+                return d;
+            }));
+            const panel = vscode.window.createWebviewPanel('compatibilityScan', 'Module Compatibility Scan', vscode.ViewColumn.One, { enableScripts: true });
+            const html = buildCompatibilityHtml(results);
+            panel.webview.html = html;
+        } catch (e) {
+            vscode.window.showErrorMessage(`Scan failed: ${e}`);
+        }
+    });
+
     context.subscriptions.push(
         refreshCommand, 
         installCommand, 
@@ -326,8 +363,24 @@ ${library.downloadUrl ? `Download URL: ${library.downloadUrl}` : ''}
         removeCommand,
         showDetailsCommand,
         updateCredentialsCommand,
-        treeView
+        scanModuleCommand,
+        treeView,
+        compatibilityView
     );
+}
+
+function buildCompatibilityHtml(results: any[]): string {
+  const rows = results.map((r: any) => {
+    const android = r.android ? `<td>AGP=${r.android.agp||'-'} / Gradle=${r.android.gradle||'-'} / Kotlin=${r.android.kotlin||'-'}</td>` : '<td>-</td>';
+    const ios = r.ios ? `<td>Podspec=${r.ios.podspecName||'-'} / Deploy=${r.ios.deploymentTarget||'-'}</td>` : '<td>-</td>';
+    const perms = r.permissions ? `<td>A:${(r.permissions.android||[]).join(', ').substring(0,40)} / I:${(r.permissions.ios||[]).join(', ').substring(0,40)}</td>` : '<td>-</td>';
+    return `<tr><td><b>${r.moduleName}</b><br><small>${r.modulePath}</small><br><span style="font-size:10px;color:#666">${r.type}</span></td><td>${r.version}</td><td>${r.sdk||'-'}</td><td>${r.type}</td>${android}${ios}${perms}</tr>`;
+  }).join('');
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;padding:20px;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #ccc;padding:8px;text-align:left;font-size:12px;}th{background:#2c3e50;color:#fff;}tr:nth-child(even){background:#f2f2f2;}</style></head><body>
+<h1>Module Compatibility Scan</h1>
+<table><tr><th>Module</th><th>Ver</th><th>SDK</th><th>Type</th><th>Android (AGP/Grad/Kotlin)</th><th>iOS (Pod/Deploy)</th><th>Permissions (A / I)</th></tr>
+${rows}</table></body></html>`;
 }
 
 async function showLibraryDetails(library: Library, nexusClient: NexusClient): Promise<void> {
